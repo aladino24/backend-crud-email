@@ -10,6 +10,7 @@ const errorController = require('./controllers/error');
 
 // routes
 const authRoute = require('./routes/auth')
+const emailRoute = require('./routes/email');
 
 // app.use(bodyParser.urlencoded({ extended: false }))
 app.use(cors());
@@ -17,6 +18,7 @@ app.use(bodyParser.json())
 
 
 app.use('/api',authRoute);
+app.use('/api', emailRoute);
 
 
 app.use(errorController.error404handler);

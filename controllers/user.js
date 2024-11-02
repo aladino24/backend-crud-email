@@ -42,37 +42,39 @@ exports.login = async (req, res, next) => {
       email:
         email
     })
-    .then((result) => {
-      if (result) {
-        bcrypt.compare(password, result.password, (err, response) => {
+    .then((resultData) => {
+      if (resultData) {
+        bcrypt.compare(password, resultData.password, (err, response) => {
           if (response) {
             // simpan waktu login
             const dataLogin = {
-              user_id: result._id,
-              name: result.name,
+              user_id: resultData._id,
+              name: resultData.name,
             };
 
-              loginSchema
-                .create(dataLogin)
-                .then((result) => {
-                  const token = jwt.sign({
-                    userId: result._id,
-                    name: result.name,
-                    email: result.email,
-                  }, 'secret123', {
-                    expiresIn: '10d'
-                  });
-                  res.json({
-                    id: result._id,
-                    status: 200,
-                    message: 'success',
-                    token: token
-                  })
-                })
-                .catch((err) => {
-                  console.log(err);
+            loginSchema
+              .create(dataLogin)
+              .then((result) => {
+                console.log(result.email)
+                const token = jwt.sign({
+                  userId: result._id,
+                  name: result.name,
+                  email: resultData.email,
+                }, 'secret123', {
+                  expiresIn: '10d'
                 });
-            
+                res.json({
+                  id: result._id,
+                  status: 200,
+                  message: 'success',
+                  email: resultData.email,
+                  token: token
+                })
+              })
+              .catch((err) => {
+                console.log(err);
+              });
+
           } else {
             res.json({
               status: 401,
@@ -92,7 +94,24 @@ exports.login = async (req, res, next) => {
     })
 }
 
-exports.logout = async(req,res,next) => {
+// cek token
+exports.verifyToken = (req, res, next) => {
+  const authHeader = req.header('Authorization');
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (!token) return res.status(401).send('Access denied. No token provided.');
+
+  try {
+    const decoded = jwt.verify(token, 'secret123');
+    req.user = decoded;
+    next();
+  } catch (ex) {
+    res.status(400).send('Invalid token.');
+  }
+};
+
+
+exports.logout = async (req, res, next) => {
   // pada saat logout update logout time dimana user_id nya sama dengan yang dikirim
   loginSchema
     .updateOne(
@@ -104,6 +123,7 @@ exports.logout = async(req,res,next) => {
       }
     )
     .then((result) => {
+      // console.log(result)
       res.json({
         status: 200,
         message: 'success'
@@ -127,7 +147,7 @@ exports.getAllUser = async (req, res, next) => {
     })
 }
 
-exports.getUserLogin = async(req,res,next) => {
+exports.getUserLogin = async (req, res, next) => {
   loginSchema
     .find()
     .then((result) => {
@@ -142,7 +162,7 @@ exports.getUserLogin = async(req,res,next) => {
     })
 }
 
-exports.deleteLogin = async(req,res,next) => {
+exports.deleteLogin = async (req, res, next) => {
   loginSchema
     .deleteOne(
       {
@@ -158,6 +178,22 @@ exports.deleteLogin = async(req,res,next) => {
     .catch((err) => {
       console.log(err);
     })
+}
 
-    
+// history login
+exports.getHistoryLogin = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    const historyLogin = await loginSchema.find({ user_id: id }).sort({ login_time: -1 }); // Sort by login_time descending
+
+    if (historyLogin.length === 0) {
+      return res.status(404).json({ message: "No login history found for this user." });
+    }
+
+    res.status(200).json(historyLogin);
+  } catch (error) {
+    console.error("Error fetching login history:", error);
+    res.status(500).json({ message: error.message });
+  }
 }
